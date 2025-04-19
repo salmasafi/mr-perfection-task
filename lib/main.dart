@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:task/core/app_theme.dart';
+import 'package:task/screens/proucts_screen.dart';
 
 void main() {
-  runApp(const MainApp());
+  runApp(ECommerceApp());
 }
 
-class MainApp extends StatelessWidget {
-  const MainApp({super.key});
+class ECommerceApp extends StatelessWidget {
+  const ECommerceApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: Scaffold(
-        body: Center(
-          child: Text('Hello World!'),
-        ),
-      ),
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: buildAppTheme(context),
+      home: ProductsScreen(),
     );
   }
+
 }
