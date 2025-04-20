@@ -7,10 +7,11 @@ ThemeData buildAppTheme(BuildContext context) {
       primaryColor: AppColors.primary,
       scaffoldBackgroundColor: AppColors.background,
       textTheme: TextTheme(
-        titleLarge: AppTextStyles.title(context),
-        titleMedium: AppTextStyles.subtitle(context),
+        titleLarge: AppTextStyles.titleLarge(context),
+        titleMedium: AppTextStyles.titleMedium(context),
         bodySmall: AppTextStyles.bodySmall(context),
-        bodyLarge: AppTextStyles.price(context),
+        bodyLarge: AppTextStyles.bodyLarge(context),
+        labelMedium:  AppTextStyles.labelMedium(context),
       ),
       iconTheme: IconThemeData(color: AppColors.icon),
     );

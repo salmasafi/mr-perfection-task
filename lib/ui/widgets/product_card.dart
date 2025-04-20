@@ -1,17 +1,14 @@
 import 'package:flutter/material.dart';
-import '../core/app_colors.dart';
-import '../core/responsive.dart';
+import '../../core/app_colors.dart';
+import '../../core/responsive.dart';
+import '../../logic/models/product_model.dart';
 
 class ProductCard extends StatelessWidget {
-  final String image;
-  final String name;
-  final double price;
+  final ProductModel productModel;
 
   const ProductCard({
     super.key,
-    required this.image,
-    required this.name,
-    required this.price,
+    required this.productModel
   });
 
   @override
@@ -40,7 +37,7 @@ class ProductCard extends StatelessWidget {
                 topRight: Radius.circular(Responsive.width(context, 20)),
               ),
               child: Image.network(
-                image,
+                productModel.image,
                 fit: BoxFit.cover,
                 width: double.infinity,
               ),
@@ -54,13 +51,32 @@ class ProductCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    name,
+                    productModel.title,
                     style: Theme.of(context).textTheme.titleMedium,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  Text("\$${price.toStringAsFixed(2)}",
-                      style: Theme.of(context).textTheme.bodyLarge),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "\$${productModel.price.toStringAsFixed(2)}",
+                        style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                      Row(
+                        children: [
+                          Icon(Icons.star,
+                              color: Colors.amber,
+                              size: Responsive.width(context, 20)),
+                          SizedBox(width: Responsive.width(context, 4)),
+                          Text(
+                            productModel.rate.toString(),
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
