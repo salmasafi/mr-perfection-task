@@ -9,5 +9,5 @@ class AppColors {
   static final card = Colors.white;
   static final icon = Colors.black;
   static final text = Colors.black;
-  static final shadow = Colors.grey.withOpacity(0.1);
+  static const shadow = Color.fromRGBO(158, 158, 158, 0.1);
 }

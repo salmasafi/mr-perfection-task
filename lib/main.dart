@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:task/core/app_theme.dart';
-import 'package:task/logic/cubit/products_cubit.dart';
-import 'package:task/ui/screens/proucts_screen.dart';
+import 'core/theme/app_theme.dart';
+import 'logic/cubit/products_cubit.dart';
+import 'ui/screens/products_screen.dart';
 
 void main() {
   runApp(ECommerceApp());

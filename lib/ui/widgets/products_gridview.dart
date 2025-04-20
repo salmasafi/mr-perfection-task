@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../core/responsive.dart';
+import '../../core/utils/responsive.dart';
 import '../../logic/models/product_model.dart';
 import 'product_card.dart';
 

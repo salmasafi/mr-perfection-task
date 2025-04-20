@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../core/app_colors.dart';
-import '../../core/responsive.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/utils/responsive.dart';
 import '../../logic/cubit/products_cubit.dart';
 import '../widgets/error_widget.dart';
 import '../widgets/loading_widget.dart';
@@ -13,6 +13,8 @@ class ProductsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final TextEditingController _searchController = TextEditingController();
+
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -40,15 +42,22 @@ class ProductsScreen extends StatelessWidget {
                             Responsive.width(context, 15)),
                       ),
                       child: TextField(
+                        controller: _searchController,
                         decoration: InputDecoration(
                           hintText: "Search products...",
                           border: InputBorder.none,
+                          
                         ),
+                        onChanged: (value){
+                          if (value.isEmpty) {
+                            context.read<ProductsCubit>().getAllProducts();
+                          }
+                        },
                       ),
                     ),
                   ),
                   SizedBox(width: Responsive.width(context, 10)),
-                  SearchButton(),
+                  SearchButton(searchController: _searchController),
                 ],
               ),
               SizedBox(height: Responsive.height(context, 20)),

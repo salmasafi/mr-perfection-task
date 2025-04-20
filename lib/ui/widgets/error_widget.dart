@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:task/logic/cubit/products_cubit.dart';
-import '../../core/responsive.dart';
+import '../../core/utils/responsive.dart';
+import '../../logic/cubit/products_cubit.dart';
 
 class ProductsErrorWidget extends StatelessWidget {
   final String message;

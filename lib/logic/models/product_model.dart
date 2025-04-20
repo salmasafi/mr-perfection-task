@@ -5,6 +5,7 @@ class ProductModel {
   final String category;
   final String image;
   final num rate;
+  final int reviews;
 
   ProductModel({
     required this.title,
@@ -13,6 +14,7 @@ class ProductModel {
     required this.category,
     required this.image,
     required this.rate,
+    required this.reviews,
   });
 
   factory ProductModel.fromApi(Map json) {
@@ -24,6 +26,7 @@ class ProductModel {
       image: json['image'] ??
           'https://www.shutterstock.com/image-vector/mystery-contest-cardboard-box-question-260nw-2472419999.jpg',
       rate: json['rating']['rate'] ?? 0.0,
+      reviews: json['rating']['count']
     );
   }
 }

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'responsive.dart';
+import '../utils/responsive.dart';
 import 'app_colors.dart';
 
 class AppTextStyles {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../core/app_colors.dart';
-import '../../core/responsive.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/utils/responsive.dart';
 
 class ProductsLoadingWidget extends StatelessWidget {
   const ProductsLoadingWidget({
