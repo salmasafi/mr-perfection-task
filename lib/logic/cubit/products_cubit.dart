@@ -1,7 +1,22 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../api/api_service.dart';
 import '../models/product_model.dart';
-part 'products_state.dart';
+
+abstract class ProductsState {}
+
+class ProductsInitial extends ProductsState {}
+
+class ProductsLoading extends ProductsState {}
+
+class ProductsLoaded extends ProductsState {
+  final List<ProductModel> products;
+  ProductsLoaded(this.products);
+}
+
+class ProductsError extends ProductsState {
+  final String message;
+  ProductsError(this.message);
+}
 
 class ProductsCubit extends Cubit<ProductsState> {
   ProductsCubit() : super(ProductsInitial());
@@ -15,7 +30,7 @@ class ProductsCubit extends Cubit<ProductsState> {
       generalProductsList = productsList;
       emit(ProductsLoaded(productsList));
     } else {
-      emit(ProductsError('There is an error, please try again'));
+      emit(ProductsError('حدث خطأ، يرجى المحاولة مرة أخرى'));
     }
   }
 

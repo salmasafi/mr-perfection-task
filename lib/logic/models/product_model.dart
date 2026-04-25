@@ -1,32 +1,50 @@
+import 'incoming_request_model.dart';
+
 class ProductModel {
+  final int id;
   final String title;
-  final num price;
   final String description;
   final String category;
   final String image;
-  final num rate;
-  final int reviews;
+  final String donorName;
+  final String condition;
+  final bool isAvailable;
+  final String createdAt;
+  final List<IncomingRequestModel>? requests;
 
   ProductModel({
+    required this.id,
     required this.title,
-    required this.price,
     required this.description,
     required this.category,
     required this.image,
-    required this.rate,
-    required this.reviews,
+    required this.donorName,
+    required this.condition,
+    this.isAvailable = true,
+    required this.createdAt,
+    this.requests,
   });
 
-  factory ProductModel.fromApi(Map json) {
+  factory ProductModel.fromJson(Map<String, dynamic> json) {
+    List<IncomingRequestModel>? parsedRequests;
+    if (json['donation_requests'] != null) {
+      parsedRequests = (json['donation_requests'] as List)
+          .map((r) => IncomingRequestModel.fromJson(r))
+          .toList();
+    }
+
     return ProductModel(
-      title: json['title'] ?? 'Untitled',
-      price: json['price'] ?? 0,
-      description: json['description'] ?? 'No description',
-      category: json['category'] ?? 'Unknown',
+      id: json['id'] ?? 0,
+      title: json['title'] ?? 'بدون عنوان',
+      description: json['description'] ?? 'لا يوجد وصف',
+      category: json['category'] ?? 'أخرى',
       image: json['image'] ??
-          'https://www.shutterstock.com/image-vector/mystery-contest-cardboard-box-question-260nw-2472419999.jpg',
-      rate: json['rating']['rate'] ?? 0.0,
-      reviews: json['rating']['count']
+          'http://www.shutterstock.com/image-vector/mystery-contest-cardboard-box-question-260nw-2472419999.jpg',
+      donorName: json['donor_name'] ?? 'متبرع مجهول',
+      condition: json['condition'] ?? 'مستعمل جيد',
+      isAvailable: json['is_available'] ?? true,
+      createdAt: json['created_at'] ?? '',
+      requests: parsedRequests,
     );
   }
 }

@@ -14,22 +14,22 @@ class SearchButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialButton(
-      onPressed: () {
+    return GestureDetector(
+      onTap: () {
         context.read<ProductsCubit>().searchProducts(
               query: searchController.text.trim().toLowerCase(),
               allProducts: ProductsCubit.generalProductsList,
             );
       },
-      color: Theme.of(context).primaryColor,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(
-          Responsive.width(context, 15),
+      child: Container(
+        height: Responsive.width(context, 50),
+        width: Responsive.width(context, 50),
+        decoration: BoxDecoration(
+          color: AppColors.primary,
+          borderRadius: BorderRadius.circular(Responsive.width(context, 15)),
         ),
+        child: const Icon(Icons.search, color: AppColors.onPrimary),
       ),
-      height: Responsive.width(context, 50),
-      minWidth: Responsive.width(context, 50),
-      child: Icon(Icons.search, color: AppColors.onPrimary),
     );
   }
 }
