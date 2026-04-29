@@ -1,14 +1,44 @@
+// شاشة تبرعاتي - بتعرض كل التبرعات اللي أضافها المستخدم الحالي
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/responsive.dart';
 import '../../logic/models/product_model.dart';
-import '../widgets/custom_button.dart';
+import '../widgets/my_donation_item.dart';
+import '../widgets/empty_state_view.dart';
+import '../widgets/loading_widget.dart';
+import '../widgets/app_dialog.dart';
 import 'add_product_screen.dart';
 import '../../logic/api/api_service.dart';
 
-class MyProductsScreen extends StatelessWidget {
+class MyProductsScreen extends StatefulWidget {
   const MyProductsScreen({super.key});
+
+  @override
+  State<MyProductsScreen> createState() => _MyProductsScreenState();
+}
+
+class _MyProductsScreenState extends State<MyProductsScreen> {
+  // دالة حذف تبرع - بتاخد الـ ID وتسأل المستخدم يأكد الحذف
+  void _deleteDonation(int id) async {
+    // بنعرض ديالوج تأكيد الحذف وننتظر رد المستخدم
+    final confirm = await AppDialog.confirm(
+      context: context,
+      title: 'حذف التبرع',
+      content:
+          'هل أنت متأكد من حذف هذا التبرع؟ سيتم حذف جميع الطلبات المتعلقة به أيضاً.',
+      confirmText: 'حذف',
+      cancelText: 'إلغاء',
+      isDestructive: true, // بيخلي زر الحذف أحمر
+    );
+
+    // لو المستخدم أكد الحذف
+    if (confirm == true) {
+      final success = await ApiService().deleteDonation(id);
+      if (success && mounted) {
+        setState(() {}); // بنعيد بناء الشاشة عشان تتحدث القائمة
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +48,8 @@ class MyProductsScreen extends StatelessWidget {
         elevation: 0,
         title: Text(
           'تبرعاتي',
-          style: TextStyle(fontFamily: 'Cairo', 
+          style: TextStyle(
+            fontFamily: 'Cairo',
             color: AppColors.text,
             fontSize: Responsive.height(context, 20),
             fontWeight: FontWeight.w700,
@@ -26,268 +57,74 @@ class MyProductsScreen extends StatelessWidget {
         ),
         centerTitle: true,
       ),
+      // FutureBuilder بيبني الـ UI بناءً على حالة الـ Future
       body: FutureBuilder<List<ProductModel>>(
-        future: ApiService().getMyDonations(),
+        future: ApiService().getMyDonations(), // بنجيب تبرعات المستخدم
         builder: (context, snapshot) {
+          // حالة التحميل
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
-            );
+            return const ProductsLoadingWidget();
           }
 
+          // حالة الخطأ
           if (snapshot.hasError) {
             return Center(
-              child: Text(
-                'حدث خطأ في جلب بيانات التبرعات',
-                style: TextStyle(fontFamily: 'Cairo', color: Colors.red),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'حدث خطأ في جلب بيانات التبرعات',
+                    style: TextStyle(fontFamily: 'Cairo', color: Colors.red),
+                  ),
+                  const SizedBox(height: 16),
+                  // زر إعادة المحاولة - بيعيد بناء الـ FutureBuilder
+                  TextButton(
+                    onPressed: () => setState(() {}),
+                    child: const Text('حاول مجدداً',
+                        style: TextStyle(
+                            fontFamily: 'Cairo', color: AppColors.primary)),
+                  ),
+                ],
               ),
             );
           }
 
+          // بنجيب القائمة أو قائمة فاضية لو مفيش بيانات
           final myProducts = snapshot.data ?? [];
 
-          return myProducts.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.inventory_2_outlined,
-                        size: Responsive.width(context, 80),
-                        color: AppColors.greyMedium,
-                      ),
-                      SizedBox(height: Responsive.height(context, 16)),
-                      Text(
-                        'لم تقم بإضافة أي تبرعات بعد',
-                        style: TextStyle(fontFamily: 'Cairo', 
-                          fontSize: Responsive.height(context, 16),
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      SizedBox(height: Responsive.height(context, 24)),
-                      Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: Responsive.width(context, 32),
-                        ),
-                        child: CustomButton(
-                          text: 'أضف تبرع جديد',
-                          icon: Icons.add,
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const AddProductScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
+          // حالة القائمة الفاضية - مفيش تبرعات
+          if (myProducts.isEmpty) {
+            return EmptyStateView(
+              title: 'لم تقم بإضافة أي تبرعات بعد',
+              subtitle:
+                  'كرمك يمكن أن يغير حياة شخص ما. ابدأ الآن بإضافة أول تبرع لك.',
+              buttonText: 'أضف تبرع جديد',
+              onActionPressed: () {
+                // بنروح لشاشة إضافة تبرع وبعدين نحدث الشاشة دي
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AddProductScreen(),
                   ),
-                )
-              : ListView.builder(
-                  padding: EdgeInsets.all(Responsive.width(context, 16)),
-                  itemCount: myProducts.length,
-                  itemBuilder: (context, index) {
-                    final product = myProducts[index];
-                    final requests = product.requests ?? [];
-                    
-                    return Container(
-                      margin: EdgeInsets.only(bottom: Responsive.height(context, 16)),
-                      decoration: BoxDecoration(
-                        color: AppColors.card,
-                        borderRadius: BorderRadius.circular(Responsive.width(context, 16)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.shadow,
-                            spreadRadius: 0,
-                            blurRadius: 15,
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          // Product Info
-                          Padding(
-                            padding: EdgeInsets.all(Responsive.width(context, 14)),
-                            child: Row(
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(Responsive.width(context, 12)),
-                                  child: Image.network(
-                                    product.image,
-                                    width: Responsive.width(context, 70),
-                                    height: Responsive.width(context, 70),
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) =>
-                                        Container(
-                                      width: Responsive.width(context, 70),
-                                      height: Responsive.width(context, 70),
-                                      color: AppColors.greyLight,
-                                      child: const Icon(Icons.image_not_supported, color: AppColors.grey),
-                                    ),
-                                  ),
-                                ),
-                                SizedBox(width: Responsive.width(context, 14)),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        product.title,
-                                        style: TextStyle(
-                                          fontFamily: 'Cairo',
-                                          fontSize: Responsive.height(context, 14),
-                                          fontWeight: FontWeight.w600,
-                                          color: AppColors.text,
-                                        ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      SizedBox(height: Responsive.height(context, 6)),
-                                      Container(
-                                        padding: EdgeInsets.symmetric(
-                                          horizontal: Responsive.width(context, 10),
-                                          vertical: Responsive.height(context, 3),
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: product.isAvailable ? AppColors.primary : AppColors.grey,
-                                          borderRadius: BorderRadius.circular(Responsive.width(context, 6)),
-                                        ),
-                                        child: Text(
-                                          product.isAvailable ? 'متاح' : 'تم الحجز',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: Responsive.height(context, 10),
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          
-                          // Requests Section
-                          if (requests.isNotEmpty) ...[
-                            Divider(height: 1, color: AppColors.greyLight),
-                            Padding(
-                              padding: EdgeInsets.all(Responsive.width(context, 14)),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'الطلبات الواردة (${requests.length})',
-                                    style: TextStyle(
-                                      fontFamily: 'Cairo',
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: Responsive.height(context, 12),
-                                      color: AppColors.text,
-                                    ),
-                                  ),
-                                  SizedBox(height: Responsive.height(context, 10)),
-                                  ...requests.map((req) => Container(
-                                    margin: EdgeInsets.only(bottom: Responsive.height(context, 8)),
-                                    padding: EdgeInsets.all(Responsive.width(context, 10)),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.background,
-                                      borderRadius: BorderRadius.circular(Responsive.width(context, 8)),
-                                      border: Border.all(color: AppColors.greyLight),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(
-                                              req.requesterName,
-                                              style: TextStyle(
-                                                fontFamily: 'Cairo',
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: Responsive.height(context, 13),
-                                              ),
-                                            ),
-                                            Text(
-                                              req.status,
-                                              style: TextStyle(
-                                                fontFamily: 'Cairo',
-                                                color: req.status == 'مقبول' ? Colors.green : (req.status == 'مرفوض' ? Colors.red : AppColors.primary),
-                                                fontSize: Responsive.height(context, 11),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        SizedBox(height: Responsive.height(context, 4)),
-                                        Text(
-                                          'العنوان: ${req.deliveryAddress} - الهاتف: ${req.deliveryPhone}',
-                                          style: TextStyle(
-                                            fontFamily: 'Cairo',
-                                            fontSize: Responsive.height(context, 11),
-                                            color: AppColors.textSecondary,
-                                          ),
-                                        ),
-                                        if (req.message.isNotEmpty) ...[
-                                          SizedBox(height: Responsive.height(context, 4)),
-                                          Text(
-                                            'الرسالة: ${req.message}',
-                                            style: TextStyle(
-                                              fontFamily: 'Cairo',
-                                              fontSize: Responsive.height(context, 11),
-                                              color: AppColors.text,
-                                            ),
-                                          ),
-                                        ],
-                                        if (req.status == 'قيد الانتظار') ...[
-                                          SizedBox(height: Responsive.height(context, 8)),
-                                          Row(
-                                            children: [
-                                              Expanded(
-                                                child: ElevatedButton(
-                                                  style: ElevatedButton.styleFrom(
-                                                    backgroundColor: Colors.green,
-                                                    minimumSize: Size(0, Responsive.height(context, 30)),
-                                                  ),
-                                                  onPressed: () async {
-                                                    await ApiService().updateRequestStatus(req.id, 'مقبول');
-                                                    // ignore: use_build_context_synchronously
-                                                    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MyProductsScreen()));
-                                                  },
-                                                  child: const Text('قبول', style: TextStyle(fontFamily: 'Cairo', color: Colors.white)),
-                                                ),
-                                              ),
-                                              SizedBox(width: Responsive.width(context, 8)),
-                                              Expanded(
-                                                child: ElevatedButton(
-                                                  style: ElevatedButton.styleFrom(
-                                                    backgroundColor: Colors.red,
-                                                    minimumSize: Size(0, Responsive.height(context, 30)),
-                                                  ),
-                                                  onPressed: () async {
-                                                    await ApiService().updateRequestStatus(req.id, 'مرفوض');
-                                                    // ignore: use_build_context_synchronously
-                                                    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MyProductsScreen()));
-                                                  },
-                                                  child: const Text('رفض', style: TextStyle(fontFamily: 'Cairo', color: Colors.white)),
-                                                ),
-                                              ),
-                                            ],
-                                          )
-                                        ],
-                                      ],
-                                    ),
-                                  )).toList(),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    );
-                  },
-                );
+                ).then((_) => setState(() {})); // لما نرجع نحدث الشاشة
+              },
+            );
+          }
+
+          // حالة النجاح - بنعرض قائمة التبرعات
+          return ListView.builder(
+            padding: EdgeInsets.all(Responsive.width(context, 16)),
+            itemCount: myProducts.length, // عدد التبرعات
+            itemBuilder: (context, index) {
+              // بنبني عنصر لكل تبرع
+              return MyDonationItem(
+                product: myProducts[index],
+                onDelete: _deleteDonation, // بنبعت دالة الحذف
+              );
+            },
+          );
         },
       ),
     );

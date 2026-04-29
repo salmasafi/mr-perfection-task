@@ -1,17 +1,17 @@
+// الشاشة الرئيسية - بتحتوي على الـ Bottom Navigation وكل التابات
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_colors.dart';
+import 'auth/login_screen.dart';
 import '../../core/utils/responsive.dart';
-import '../../logic/cubit/cart_cubit.dart';
 import '../../logic/cubit/products_cubit.dart';
 import '../widgets/bottom_nav.dart';
 import '../widgets/error_widget.dart';
 import '../widgets/loading_widget.dart';
 import '../widgets/products_gridview.dart';
-import '../widgets/search_button.dart';
+import '../widgets/empty_state_view.dart';
 import 'add_product_screen.dart';
-import 'cart_screen.dart';
 import 'my_products_screen.dart';
 
 class ProductsScreen extends StatefulWidget {
@@ -22,33 +22,94 @@ class ProductsScreen extends StatefulWidget {
 }
 
 class _ProductsScreenState extends State<ProductsScreen> {
-  int _currentIndex = 0;
-  final TextEditingController _searchController = TextEditingController();
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
+  int _currentIndex = 0; // رقم التاب الحالي (0 = الرئيسية)
 
   @override
   Widget build(BuildContext context) {
+    // قائمة الشاشات - كل تاب بيعرض شاشة مختلفة
     final screens = [
-      _buildHomeScreen(context),
-      const CartScreen(),
-      const AddProductScreen(),
-      const MyProductsScreen(),
+      _buildHomeScreen(context), // تاب 0: الرئيسية
+      AddProductScreen(
+        // تاب 1: إضافة تبرع
+        onDonationPublished: () {
+          // لما التبرع يتنشر: نحدث المنتجات ونرجع للرئيسية
+          context.read<ProductsCubit>().fetchProducts();
+          setState(() => _currentIndex = 0); // نروح تاب الرئيسية
+        },
+      ),
+      const MyProductsScreen(), // تاب 2: تبرعاتي
     ];
 
     return Scaffold(
+      // بنعرض الشاشة المناسبة حسب التاب المختار
       body: screens[_currentIndex],
       bottomNavigationBar: BottomNav(
         currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
+        onTap: (index) {
+          if (index == 3) {
+            // تاب الخروج - بنعرض ديالوج تأكيد
+            _showLogoutDialog(context);
+          } else {
+            // لو ضغط على الرئيسية نحدث المنتجات
+            if (index == 0) {
+              context.read<ProductsCubit>().fetchProducts();
+            }
+            // بنغير التاب
+            setState(() => _currentIndex = index);
+          }
+        },
       ),
     );
   }
 
+  // دالة عرض ديالوج تأكيد تسجيل الخروج
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text(
+          'تسجيل الخروج',
+          style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold),
+          textAlign: TextAlign.center,
+        ),
+        content: const Text(
+          'هل أنت متأكد أنك تريد تسجيل الخروج؟',
+          style: TextStyle(fontFamily: 'Cairo'),
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          // زر الإلغاء
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إلغاء', style: TextStyle(fontFamily: 'Cairo')),
+          ),
+          // زر الخروج
+          TextButton(
+            onPressed: () async {
+              await Supabase.instance.client.auth.signOut(); // بنسجل خروج من سوبابيز
+              if (context.mounted) {
+                // بنروح لشاشة الدخول ونمسح كل الشاشات السابقة
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (route) => false, // بنمسح كل الـ stack
+                );
+              }
+            },
+            child: const Text(
+              'خروج',
+              style: TextStyle(
+                  fontFamily: 'Cairo',
+                  color: Colors.red, // أحمر عشان هو action خطير
+                  fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // دالة بناء شاشة الرئيسية (تاب 0)
   Widget _buildHomeScreen(BuildContext context) {
     return SafeArea(
       child: SingleChildScrollView(
@@ -59,75 +120,45 @@ class _ProductsScreenState extends State<ProductsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
+            // ========== الهيدر ==========
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // تحية الترحيب
                     Text(
                       "مرحباً 👋",
-                      style: TextStyle(fontFamily: 'Cairo', 
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
                         fontSize: Responsive.height(context, 24),
                         fontWeight: FontWeight.w700,
                         color: AppColors.text,
                       ),
                     ),
                     SizedBox(height: Responsive.height(context, 2)),
+                    // نص توضيحي
                     Text(
                       "تصفح التبرعات المتاحة",
-                      style: TextStyle(fontFamily: 'Cairo', 
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
                         fontSize: Responsive.height(context, 13),
                         color: AppColors.textSecondary,
                       ),
                     ),
                   ],
                 ),
-                BlocBuilder<RequestsCubit, RequestsState>(
-                  builder: (context, state) {
-                    if (state.totalItems == 0) return const SizedBox.shrink();
-                    return GestureDetector(
-                      onTap: () => setState(() => _currentIndex = 1),
-                      child: Container(
-                        padding: EdgeInsets.all(Responsive.width(context, 10)),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(
-                              Responsive.width(context, 14)),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.volunteer_activism,
-                              color: Colors.white,
-                              size: Responsive.width(context, 18),
-                            ),
-                            SizedBox(width: Responsive.width(context, 4)),
-                            Text(
-                              '${state.totalItems}',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: Responsive.height(context, 14),
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
               ],
             ),
             SizedBox(height: Responsive.height(context, 24)),
 
-            // Welcome banner
+            // ========== البانر الترحيبي الأخضر ==========
             Container(
               width: double.infinity,
               padding: EdgeInsets.all(Responsive.width(context, 20)),
               decoration: BoxDecoration(
-                color: AppColors.primary,
+                color: AppColors.primary, // خلفية خضرا
                 borderRadius:
                     BorderRadius.circular(Responsive.width(context, 20)),
               ),
@@ -136,18 +167,20 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 children: [
                   Text(
                     '💚 ساهم في العطاء',
-                    style: TextStyle(fontFamily: 'Cairo', 
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
                       fontSize: Responsive.height(context, 18),
                       fontWeight: FontWeight.w700,
-                      color: AppColors.onPrimary,
+                      color: AppColors.onPrimary, // أبيض
                     ),
                   ),
                   SizedBox(height: Responsive.height(context, 6)),
                   Text(
                     'تبرع بما لا تحتاج، واطلب ما يحتاجه غيرك.\nكل شيء هنا مجاني.',
-                    style: TextStyle(fontFamily: 'Cairo', 
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
                       fontSize: Responsive.height(context, 12),
-                      color: Colors.white70,
+                      color: Colors.white70, // أبيض شفاف شوية
                       height: 1.5,
                     ),
                   ),
@@ -156,57 +189,36 @@ class _ProductsScreenState extends State<ProductsScreen> {
             ),
             SizedBox(height: Responsive.height(context, 24)),
 
-            // Search bar
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    height: Responsive.width(context, 50),
-                    padding: EdgeInsets.symmetric(
-                        horizontal: Responsive.width(context, 15)),
-                    decoration: BoxDecoration(
-                      color: AppColors.greyLight,
-                      borderRadius: BorderRadius.circular(
-                          Responsive.width(context, 15)),
-                    ),
-                    child: TextField(
-                      controller: _searchController,
-                      textAlignVertical: TextAlignVertical.center,
-                      cursorColor: AppColors.primary,
-                      style: TextStyle(fontFamily: 'Cairo', 
-                        fontSize: Responsive.height(context, 14),
-                      ),
-                      decoration: InputDecoration(
-                        hintText: "ابحث عن تبرع...",
-                        hintStyle: TextStyle(
-                          color: AppColors.textHint,
-                          fontSize: Responsive.height(context, 14),
-                        ),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                      onChanged: (value) {
-                        if (value.isEmpty) {
-                          context.read<ProductsCubit>().getAllProducts();
-                        }
-                      },
-                    ),
-                  ),
-                ),
-                SizedBox(width: Responsive.width(context, 10)),
-                SearchButton(searchController: _searchController),
-              ],
-            ),
-            SizedBox(height: Responsive.height(context, 24)),
-
-            // Products grid
+            // ========== قائمة التبرعات ==========
+            // BlocBuilder بيعيد بناء الـ UI كل ما الـ state تتغير
             BlocBuilder<ProductsCubit, ProductsState>(
               builder: (context, state) {
                 if (state is ProductsLoaded) {
+                  // نجح جلب البيانات
+                  if (state.products.isEmpty) {
+                    // مفيش تبرعات - بنعرض شاشة فارغة
+                    return Padding(
+                      padding: EdgeInsets.only(
+                          top: Responsive.height(context, 40)),
+                      child: EmptyStateView(
+                        title: 'لا توجد منتجات متبرع بها الآن',
+                        subtitle:
+                            'عد مرة أخرى لاحقاً أو ابدأ بتبرعك الآن لتساعد غيرك.',
+                        buttonText: 'ابدأ بالتبرع الآن',
+                        onActionPressed: () {
+                          // بنروح لتاب إضافة تبرع
+                          setState(() => _currentIndex = 1);
+                        },
+                      ),
+                    );
+                  }
+                  // في تبرعات - بنعرضها في الـ Grid
                   return ProductsGridView(state.products);
                 } else if (state is ProductsError) {
+                  // حصل خطأ - بنعرض ويدجت الخطأ مع زر إعادة المحاولة
                   return ProductsErrorWidget(state.message);
                 } else {
+                  // بيتحمل - بنعرض دايرة التحميل
                   return const ProductsLoadingWidget();
                 }
               },

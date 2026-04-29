@@ -1,127 +1,76 @@
+// شاشة إضافة تبرع جديد - المستخدم بيدخل بيانات التبرع هنا
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/responsive.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/custom_text_field.dart';
+import '../widgets/motivational_banner.dart';
+import '../widgets/app_dialog.dart';
+import '../widgets/app_snackbar.dart';
 import '../../logic/api/api_service.dart';
 
 class AddProductScreen extends StatefulWidget {
-  const AddProductScreen({super.key});
+  // callback بيتنادى لما التبرع يتنشر بنجاح عشان نرجع للرئيسية
+  final VoidCallback? onDonationPublished;
+
+  const AddProductScreen({super.key, this.onDonationPublished});
 
   @override
   State<AddProductScreen> createState() => _AddProductScreenState();
 }
 
 class _AddProductScreenState extends State<AddProductScreen> {
+  // controllers لحقول الإدخال
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
-  String _selectedCategory = 'إلكترونيات';
-  String _selectedCondition = 'مستعمل جيد';
+  final _imageUrlController = TextEditingController();
 
-  final List<String> _categories = [
-    'إلكترونيات',
-    'ملابس',
-    'أثاث',
-    'كتب',
-    'ألعاب',
-    'رياضة',
-    'إكسسوارات',
-    'أخرى',
-  ];
-
-  final List<String> _conditions = [
-    'جديد',
-    'مستعمل جيد',
-    'مستعمل',
-  ];
+  bool _isLoading = false; // عشان نعرض loading لما بننشر
 
   @override
   void dispose() {
+    // بنتخلص من الـ controllers عشان منحصلش memory leak
     _titleController.dispose();
     _descriptionController.dispose();
+    _imageUrlController.dispose();
     super.dispose();
   }
 
-  bool _isLoading = false;
-
+  // دالة نشر التبرع
   Future<void> _publishDonation() async {
+    // بنتأكد إن الاسم مش فاضي
     if (_titleController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('يرجى إدخال اسم التبرع'),
-          backgroundColor: Colors.red.shade400,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
-      return;
+      AppSnackbar.showError(context, 'يرجى إدخال اسم التبرع');
+      return; // بنوقف هنا ومنكملش
     }
 
-    setState(() => _isLoading = true);
+    setState(() => _isLoading = true); // نبدأ التحميل
+
+    // بنبعت البيانات للـ API
     final success = await ApiService().createDonation(
       title: _titleController.text,
       description: _descriptionController.text,
-      categoryName: _selectedCategory,
-      condition: _selectedCondition,
+      imageUrl: _imageUrlController.text.trim(), // بنشيل المسافات من الرابط
     );
 
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+    if (!mounted) return; // لو الشاشة اتقفلت منكملش
+    setState(() => _isLoading = false); // نوقف التحميل
 
     if (success) {
-      showDialog(
+      // نجح! بنعرض ديالوج النجاح
+      AppDialog.show(
         context: context,
-        builder: (dialogContext) => AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text(
-            'تم نشر التبرع! 💚',
-            style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w700),
-            textAlign: TextAlign.center,
-          ),
-          content: const Text(
-            'شكراً لكرمك!\nتم نشر تبرعك الآن بنجاح وسيظهر للجميع.',
-            style: TextStyle(
-              fontFamily: 'Cairo',
-              color: AppColors.textSecondary,
-              height: 1.5,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          actions: [
-            Center(
-              child: TextButton(
-                onPressed: () {
-                  Navigator.pop(dialogContext); // Close dialog
-                  Navigator.pop(context); // Go back to previous screen
-                },
-                child: const Text(
-                  'حسناً',
-                  style: TextStyle(
-                    fontFamily: 'Cairo',
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+        title: 'تم نشر التبرع! 💚',
+        content: 'شكراً لكرمك!\nتم نشر تبرعك الآن بنجاح وسيظهر للجميع.',
+        onConfirm: () {
+          Navigator.pop(context); // بنقفل الديالوج
+          widget.onDonationPublished?.call(); // بنرجع للرئيسية ونحدث المنتجات
+        },
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content:
-              const Text('حدث خطأ أثناء نشر التبرع. يرجى المحاولة لاحقاً.'),
-          backgroundColor: Colors.red.shade400,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+      // فشل - بنعرض رسالة خطأ
+      AppSnackbar.showError(
+          context, 'حدث خطأ أثناء نشر التبرع. يرجى المحاولة لاحقاً.');
     }
   }
 
@@ -147,171 +96,45 @@ class _AddProductScreenState extends State<AddProductScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Motivational message
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.all(Responsive.width(context, 16)),
-              decoration: BoxDecoration(
-                color: AppColors.greyLight,
-                borderRadius:
-                    BorderRadius.circular(Responsive.width(context, 16)),
-              ),
-              child: Row(
-                children: [
-                  Text(
-                    '💚',
-                    style: TextStyle(fontSize: Responsive.height(context, 24)),
-                  ),
-                  SizedBox(width: Responsive.width(context, 12)),
-                  Expanded(
-                    child: Text(
-                      'تبرعك يصنع الفرق في حياة شخص آخر',
-                      style: TextStyle(
-                        fontFamily: 'Cairo',
-                        fontSize: Responsive.height(context, 13),
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            // بانر تحفيزي في الأعلى
+            const MotivationalBanner(
+              text: 'تبرعك يصنع الفرق في حياة شخص آخر',
             ),
             SizedBox(height: Responsive.height(context, 24)),
 
+            // حقل اسم التبرع
             CustomTextField(
               hint: 'اسم التبرع',
               controller: _titleController,
-              isRequired: true,
             ),
             SizedBox(height: Responsive.height(context, 16)),
+
+            // حقل وصف التبرع - متعدد الأسطر
             CustomTextField(
               hint: 'وصف التبرع',
               controller: _descriptionController,
-              maxLines: 4,
+              maxLines: 4, // 4 أسطر عشان يقدر يكتب وصف كافي
             ),
             SizedBox(height: Responsive.height(context, 16)),
 
-            // Category dropdown
-            _buildDropdown(
-              value: _selectedCategory,
-              items: _categories,
-              onChanged: (value) => setState(() => _selectedCategory = value!),
-            ),
-            SizedBox(height: Responsive.height(context, 16)),
-
-            // Condition dropdown
-            _buildDropdown(
-              value: _selectedCondition,
-              items: _conditions,
-              onChanged: (value) => setState(() => _selectedCondition = value!),
-            ),
-            SizedBox(height: Responsive.height(context, 16)),
-
-            // Image upload area
-            Text(
-              'الصور',
-              style: TextStyle(
-                fontFamily: 'Cairo',
-                fontSize: Responsive.height(context, 16),
-                fontWeight: FontWeight.w600,
-                color: AppColors.text,
-              ),
-            ),
-            SizedBox(height: Responsive.height(context, 8)),
-            GestureDetector(
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text('اختيار الصور من المعرض (قريباً)'),
-                    backgroundColor: AppColors.primary,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                );
-              },
-              child: Container(
-                height: Responsive.width(context, 120),
-                decoration: BoxDecoration(
-                  color: AppColors.greyLight,
-                  borderRadius:
-                      BorderRadius.circular(Responsive.width(context, 16)),
-                  border: Border.all(
-                    color: AppColors.greyMedium,
-                    width: 1.5,
-                    strokeAlign: BorderSide.strokeAlignInside,
-                  ),
-                ),
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.add_photo_alternate_outlined,
-                        size: Responsive.width(context, 40),
-                        color: AppColors.grey,
-                      ),
-                      SizedBox(height: Responsive.height(context, 8)),
-                      Text(
-                        'إضافة صور',
-                        style: TextStyle(
-                          fontFamily: 'Cairo',
-                          color: AppColors.textSecondary,
-                          fontSize: Responsive.height(context, 13),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+            // حقل رابط الصورة
+            CustomTextField(
+              hint: 'رابط الصورة',
+              controller: _imageUrlController,
+              icon: Icons.link, // أيقونة رابط
             ),
             SizedBox(height: Responsive.height(context, 32)),
+
+            // زر النشر أو دايرة التحميل
             _isLoading
                 ? const Center(
                     child: CircularProgressIndicator(color: AppColors.primary))
                 : CustomButton(
                     text: 'نشر التبرع',
-                    icon: Icons.volunteer_activism,
+                    icon: Icons.volunteer_activism, // أيقونة قلب
                     onPressed: _publishDonation,
                   ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDropdown({
-    required String value,
-    required List<String> items,
-    required void Function(String?) onChanged,
-  }) {
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: Responsive.width(context, 16),
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.greyLight,
-        borderRadius: BorderRadius.circular(Responsive.width(context, 15)),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          isExpanded: true,
-          icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.grey),
-          style: TextStyle(
-            fontFamily: 'Cairo',
-            color: AppColors.text,
-            fontSize: Responsive.height(context, 14),
-          ),
-          items: items.map((item) {
-            return DropdownMenuItem(
-              value: item,
-              child: Text(item),
-            );
-          }).toList(),
-          onChanged: onChanged,
         ),
       ),
     );
