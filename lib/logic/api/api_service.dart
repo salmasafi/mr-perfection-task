@@ -1,148 +1,165 @@
-// ملف الـ API - ده اللي بيتكلم مع سوبابيز (قاعدة البيانات)
-// كل العمليات اللي بتحتاج إنترنت موجودة هنا
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/product_model.dart';
 
 class ApiService {
-  // بنجيب الـ client بتاع سوبابيز عشان نعمل بيه الطلبات
   final SupabaseClient _supabase = Supabase.instance.client;
 
-  // ========== 1. جلب كل التبرعات ==========
+  // 1. جلب كل المنتجات
   Future<List<ProductModel>> getAllProducts() async {
     try {
-      // بنعمل SELECT من جدول donations مع بيانات المتبرع
-      final response = await _supabase.from('donations').select('''
+      final response = await _supabase.from('products').select('''
             id,
             title,
             description,
             image_link,
             profiles!donor_id ( id, full_name, phone_number, address )
-          ''').order('id', ascending: false); // الأحدث أول
+          ''').order('id', ascending: false);
 
-      // بنحول كل row في النتيجة لـ ProductModel
       final products = (response as List).map((item) {
         return ProductModel.fromJson(item);
       }).toList();
 
       return products;
     } catch (e) {
-      print('Supabase Fetch Error: $e'); // بنطبع الخطأ في الـ console
-      return []; // لو حصل خطأ نرجع قائمة فاضية
+      print('Supabase Fetch Error: $e');
+      return [];
     }
   }
 
-  // ========== 2. جلب تبرعات المستخدم الحالي مع الطلبات الواردة ==========
+  // 2. جلب منتجات المستخدم الحالي مع الطلبات الواردة
   Future<List<ProductModel>> getMyDonations() async {
     try {
-      // بنجيب المستخدم الحالي
       final user = _supabase.auth.currentUser;
-      if (user == null) return []; // لو مفيش يوزر مسجل نرجع قائمة فاضية
+      if (user == null) return [];
 
-      // بنجيب التبرعات بتاعت المستخدم ده بس مع الطلبات الواردة عليها
-      final response = await _supabase.from('donations').select('''
+      final response = await _supabase.from('products').select('''
         id,
         title,
         description,
         image_link,
         profiles!donor_id ( id, full_name, phone_number, address ),
-        donation_requests (
+        incoming_requests (
           id,
+          requester_id,
           message,
           delivery_address,
-          delivery_phone,
-          profiles!requester_id ( id, full_name, phone_number, address )
+          delivery_phone
         )
-      ''').eq('donor_id', user.id) // فلتر على الـ donor_id بتاع المستخدم الحالي
-          .order('id', ascending: false); // الأحدث أول
+      ''').eq('donor_id', user.id).order('id', ascending: false);
 
-      // بنحول كل row لـ ProductModel
-      return (response as List).map((item) {
+      final rows = (response as List).cast<Map<String, dynamic>>();
+      final requesterIds = rows
+          .expand((item) =>
+              (item['incoming_requests'] as List? ?? []).map((request) {
+                return (request as Map<String, dynamic>)['requester_id']
+                    ?.toString();
+              }))
+          .whereType<String>()
+          .toSet()
+          .toList();
+
+      final Map<String, Map<String, dynamic>> profilesById = {};
+      if (requesterIds.isNotEmpty) {
+        final requesterIdsFilter = requesterIds.join(',');
+        final profilesResponse = await _supabase
+            .from('profiles')
+            .select('id, full_name, phone_number, address')
+            .filter('id', 'in', '($requesterIdsFilter)');
+        for (final profile in (profilesResponse as List)) {
+          final profileMap = profile as Map<String, dynamic>;
+          final id = profileMap['id']?.toString();
+          if (id != null) {
+            profilesById[id] = profileMap;
+          }
+        }
+      }
+
+      return rows.map((item) {
+        final requests = (item['incoming_requests'] as List?) ?? [];
+        item['incoming_requests'] = requests.map((request) {
+          final requestMap =
+              Map<String, dynamic>.from(request as Map<String, dynamic>);
+          final requesterId = requestMap['requester_id']?.toString();
+          if (requesterId != null && profilesById.containsKey(requesterId)) {
+            requestMap['profiles'] = profilesById[requesterId];
+          }
+          return requestMap;
+        }).toList();
         return ProductModel.fromJson(item);
       }).toList();
     } catch (e) {
-      print('Fetch My Donations Error: $e');
+      print('Fetch My Products Error: $e');
       return [];
     }
   }
 
-  // ========== 3. حذف تبرع ==========
-  Future<bool> deleteDonation(int donationId) async {
+  // 3. حذف منتج
+  Future<bool> deleteDonation(int productId) async {
     try {
-      // لازم نحذف الطلبات الواردة الأول عشان في foreign key constraint
       await _supabase
-          .from('donation_requests')
+          .from('incoming_requests')
           .delete()
-          .eq('donation_id', donationId);
-
-      // بعدين نحذف التبرع نفسه
-      await _supabase.from('donations').delete().eq('id', donationId);
-
-      return true; // الحذف نجح
+          .eq('product_id', productId);
+      await _supabase.from('products').delete().eq('id', productId);
+      return true;
     } catch (e) {
-      print('Delete Donation Error: $e');
-      return false; // الحذف فشل
+      print('Delete Product Error: $e');
+      return false;
     }
   }
 
-  // ========== 4. إضافة تبرع جديد ==========
+  // 4. إضافة منتج جديد
   Future<bool> createDonation({
-    required String title, // اسم التبرع (إجباري)
-    required String description, // الوصف (إجباري)
-    String? imageUrl, // رابط الصورة (اختياري)
+    required String title,
+    required String description,
+    String? imageUrl,
   }) async {
     try {
-      // بنجيب المستخدم الحالي عشان نحط الـ donor_id
-      final user = _supabase.auth.currentUser;
-      if (user == null) return false; // لو مفيش يوزر مسجل نرجع false
-
-      // بنضيف التبرع في جدول donations
-      await _supabase.from('donations').insert({
-        'title': title,
-        'description': description,
-        'donor_id': user.id, // الـ ID بتاع المتبرع
-        'image_link': imageUrl, // رابط الصورة (ممكن يكون null)
-      });
-
-      return true; // الإضافة نجحت
-    } catch (e) {
-      print('Create Donation Error: $e');
-      return false; // الإضافة فشلت
-    }
-  }
-
-  // ========== 5. إرسال طلب للحصول على تبرع ==========
-  Future<bool> createDonationRequest({
-    required int productId, // رقم التبرع اللي عايزه
-    required String fullName, // اسم الطالب
-    required String phone, // رقم هاتفه
-    required String address, // عنوانه
-    String? message, // رسالة للمتبرع (اختياري)
-  }) async {
-    try {
-      // بنجيب المستخدم الحالي
       final user = _supabase.auth.currentUser;
       if (user == null) return false;
 
-      // بنحدث بيانات الـ profile بتاع المستخدم بالمعلومات الجديدة
+      await _supabase.from('products').insert({
+        'title': title,
+        'description': description,
+        'donor_id': user.id,
+        'image_link': imageUrl,
+      });
+      return true;
+    } catch (e) {
+      print('Create Product Error: $e');
+      return false;
+    }
+  }
+
+  // 5. إرسال طلب وارد
+  Future<bool> createDonationRequest({
+    required int productId,
+    required String fullName,
+    required String phone,
+    required String address,
+    String? message,
+  }) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return false;
+
       await _supabase.from('profiles').update({
         'full_name': fullName,
         'phone_number': phone,
         'address': address,
-      }).eq('id', user.id); // بس الـ profile بتاعه هو
+      }).eq('id', user.id);
 
-      // بنضيف الطلب في جدول donation_requests
-      await _supabase.from('donation_requests').insert({
-        'donation_id': productId, // رقم التبرع
-        'requester_id': user.id, // رقم الطالب
-        'delivery_address': address, // عنوان التوصيل
-        'delivery_phone': phone, // رقم هاتف التوصيل
-        'message': message, // الرسالة (ممكن تكون null)
+      await _supabase.from('incoming_requests').insert({
+        'product_id': productId,
+        'requester_id': user.id,
+        'delivery_address': address,
+        'delivery_phone': phone,
+        'message': message,
       });
-
-      return true; // الطلب اتبعت بنجاح
+      return true;
     } catch (e) {
       print('Create Request Error: $e');
-      return false; // الطلب فشل
+      return false;
     }
   }
 }

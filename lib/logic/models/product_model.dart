@@ -36,9 +36,9 @@ class ProductModel {
 
     // بنحول قائمة الطلبات لو موجودة
     List<IncomingRequestModel>? requestsList;
-    if (json['donation_requests'] != null) {
+    if (json['incoming_requests'] != null) {
       // بنلف على كل طلب ونحوله لـ IncomingRequestModel
-      requestsList = (json['donation_requests'] as List)
+      requestsList = (json['incoming_requests'] as List)
           .map((req) => IncomingRequestModel.fromJson(req))
           .toList();
     }
